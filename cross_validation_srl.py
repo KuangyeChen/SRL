@@ -3,8 +3,9 @@
 import logging
 import argparse
 import numpy as np
-from core import validation_in_tensor
-from core import read_database_from_file
+from core.knowledge_graph import KnowledgeGraph
+from core.core import validation_in_tensor
+from core.core import read_database_from_file
 
 parser = argparse.ArgumentParser('Script for cross validation')
 parser.add_argument('filename', metavar='F', help='Database file')
@@ -27,12 +28,13 @@ if __name__ == '__main__':
     logging.info('%d fold cross validation' % args.fold)
     logging.info('Algorithm: %s, rank: %s' % (args.algorithm, str(args.rank)))
     logging.info('Loading database...')
-    database, rel_names, ent_names = read_database_from_file(args.filename)
-    logging.info('Loading done.')
-    logging.info('Shape of tensor: %s' % str(database.shape) )
-    logging.info('Valid relations in tensor: %d / %d = %.3f%%\n' % (
-        int(np.sum(database)), database.size, 100 * np.sum(database) / database.size))
+    kg = KnowledgeGraph()
+    kg.read_data_from_txt(args.filename)
 
+    logging.info('Loading done.')
+    logging.info('Rels: %d, Ents: %d' % (kg.number_of_relations(),kg.number_of_entities()))
+
+    database = kg.to_numpy_array()
     # Do cross-validation
     FOLDS = args.fold
     IDX = list(range(database.size))
