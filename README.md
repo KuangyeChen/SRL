@@ -18,7 +18,7 @@ database.read_data_from_txt('data/kin')
 ### Neural Tensor Network (roughly done)
 (For now) Run script `./train_ntn`<br>
 Change hyperparameters directly in script.
-#####Visualization from TensorFlow
+##### Visualization from TensorFlow
 ![NTN_structure](others/ntn_structure.png)
 
 ### Cross validation script<br>(Will be deleted after merging training routine)
