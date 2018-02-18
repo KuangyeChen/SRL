@@ -1,3 +1,5 @@
+# DO NOT IMPORT FROM THIS
+
 import re
 import numpy as np
 from scipy.sparse import lil_matrix
@@ -7,12 +9,7 @@ from sklearn.metrics import auc, roc_auc_score
 from core.sktensor import dtensor, tucker_hooi, cp_als
 from core.sktensor.rescal import als as rescal_als
 
-__all__ = ['parse_triple',
-           'read_database_from_file',
-           'predict_rescal_als',
-           'predict_tucker_hooi',
-           'predict_cp_als',
-           'validation_in_tensor']
+__all__ = []
 
 
 def parse_triple(a_triple):

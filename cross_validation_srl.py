@@ -7,6 +7,8 @@ from core.knowledge_graph import KnowledgeGraph
 from core.core import validation_in_tensor
 from core.core import read_database_from_file
 
+__all__ = []
+
 parser = argparse.ArgumentParser('Script for cross validation')
 parser.add_argument('filename', metavar='F', help='Database file')
 parser.add_argument('-f', '--fold', type=int, default=10,

@@ -115,7 +115,7 @@ def metrics_in_a_batch(predicts, labels):
         Average precision score
         (temporary) Precision for threshold 0.5
 
-    :param predicts: predicts for each triple.
+    :param predicts: Predicts for each triple.
     :param labels: True labels for each triple.
     :return: MRR, HIT@10, AUC_PR, AP, PRC_0.5.
     """

@@ -1,3 +1,6 @@
+## Core
+**core.py** will be removed.<br>
+Functionality is separated.
 ### Database Form
 A database should contain three files:<br>
 data.txt: each row is a triple. e.g. `Disease_or_Syndrome Affects Plant`<br> 
@@ -15,11 +18,16 @@ database = KnowledgeGraph()
 database.read_data_from_txt('data/kin')
 ```
 
-### Neural Tensor Network (roughly done)
-(For now) Run script `./train_ntn`<br>
+## Scripts
+Scripts will not be made as command line apps, since they will eventually be merged with GUI.<br>
+**cross_validation_srl.py** will be removed.
+### Tensor Factorization
+Run script `./tensor_factorization.py`<br>
 Change hyperparameters directly in script.
+
+### Neural Tensor Network
+Run script `./train_ntn.py`<br>
+Change hyperparameters directly in script.
+
 ##### Visualization from TensorFlow
 ![NTN_structure](others/ntn_structure.png)
-
-### Cross validation script<br>(Will be deleted after merging training routine)
-Usage example: `./cross_validation_srl.py kin.db -f 10 -a rescal -r 100`

@@ -6,6 +6,7 @@ import core.ntn_model as ntn_model
 from core.knowledge_graph import KnowledgeGraph
 from core.link_predict_utils import *
 
+dataset = 'data/kin'
 num_iter = 300
 slice_size = 2
 embed_size = 100
@@ -30,7 +31,7 @@ def fill_feed_dict(placeholders, data_lists, num_relations):
 
 def run_training():
     database = KnowledgeGraph()
-    database.read_data_from_txt('data/kin')
+    database.read_data_from_txt(dataset)
     database.spilt_train_valid_test(valid_percent, test_percent)
     num_entities = database.number_of_entities()
     num_relations = database.number_of_relations()
@@ -48,10 +49,8 @@ def run_training():
             batch_placeholders, corrupt_placeholders, relation_r_empty, num_entities,
             num_relations, embed_size, slice_size, lambda_para, learning_rate)
 
-        merged = tf.summary.merge_all()
         saver = tf.train.Saver(tf.trainable_variables())
         sess = tf.Session()
-        summary_writer = tf.summary.FileWriter('./tmp/ntn', sess.graph)
         sess.run(tf.global_variables_initializer())
         print("Start training")
         for step in range(1, num_iter+1):
