@@ -18,16 +18,22 @@ database = KnowledgeGraph()
 database.read_data_from_txt('data/kin')
 ```
 
-## Scripts
+## Scripts for Tensor Factorization
 Scripts will not be made as command line apps, since they will eventually be merged with GUI.<br>
 **cross_validation_srl.py** will be removed.
-### Tensor Factorization
+
 Run script `./tensor_factorization.py`<br>
 Change hyperparameters directly in script.
 
-### Neural Tensor Network
-Run script `./train_ntn.py`<br>
-Change hyperparameters directly in script.
+For neural networks use Jupyter notebook instead.
 
-##### Visualization from TensorFlow
-![NTN_structure](others/ntn_structure.png)
+
+## Jupyter Notebook
+Interactive environment is more suitable for machine learning and 
+neural networks programming, especially during training and 
+hyperparameters tuning. Neural networks are hard to train.<br>
+All neural networks' training and testing codes are now in the notebook
+`Neural_Networks.ipynb`
+
+Run cells for corresponding neural networks.<br>
+For babysitting during the training, run `tensorboard --logdir=tmp/log/`

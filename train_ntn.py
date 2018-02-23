@@ -6,12 +6,12 @@ import core.ntn_model as ntn_model
 from core.knowledge_graph import KnowledgeGraph
 from core.link_predict_utils import *
 
-dataset = 'data/kin'
+dataset = 'data/kin_nominal'
 num_iter = 300
 slice_size = 2
-embed_size = 100
+rank = 100
 corrupt_size_train = 10
-corrupt_size_eval = 100
+corrupt_size_eval = 3
 batch_size = 6000
 valid_percent = 0.05
 test_percent = 0.05
@@ -21,12 +21,30 @@ report_per_iter = 10
 learning_rate = 0.1
 
 
-def fill_feed_dict(placeholders, data_lists, num_relations):
+def fill_feed_dict(input_list_r, data_list_r, input_list, data_list, num_relations):
     feed_dict = {}
-    for r in range(num_relations):
-        for (var, value) in zip(placeholders, data_lists):
+    for (var, value) in zip(input_list_r, data_list_r):
+        for r in range(num_relations):
             feed_dict[var[r]] = value[r]
+
+    for (var, value) in zip(input_list, data_list):
+        feed_dict[var] = value
+
     return feed_dict
+
+
+def ntn_evaluation(batch, labels, num_relations, sess, predicts,
+                   batch_input, labels_input, r_empty_input):
+
+    batch_list, labels, r_empty = make_split(batch, labels, num_relations)
+    feed_dict = fill_feed_dict([batch_input, r_empty_input], [batch_list, r_empty],
+                               [labels_input], [labels], num_relations)
+
+    valid_predicts = sess.run(predicts, feed_dict=feed_dict)
+
+    mrr, hit_at_10, auc_pr, ap, precision, num_pos = metrics_in_a_batch(valid_predicts, labels)
+    print("mrr: %f, hit@10: %f, auc_pr: %f, ap: %f, positive predicts: %d, precision: %f" %
+          (mrr, hit_at_10, auc_pr, ap, num_pos, precision))
 
 
 def run_training():
@@ -38,16 +56,15 @@ def run_training():
 
     with tf.Graph().as_default():
         with tf.name_scope('Feed_in'):
-            batch_placeholders = [tf.placeholder(shape=[None, 2], name='batch_%d' % r, dtype=tf.int32)
-                                  for r in range(num_relations)]
-            corrupt_placeholders = [tf.placeholder(shape=[None], name='corrupt_%d' % r, dtype=tf.int32)
-                                    for r in range(num_relations)]
-            relation_r_empty = [tf.placeholder(shape=[], name='empty_%d' % r, dtype=tf.bool)
-                                for r in range(num_relations)]
+            batch_input = [tf.placeholder(shape=[None, 2], name='batch_%d' % r, dtype=tf.int32)
+                           for r in range(num_relations)]
+            r_empty_input = [tf.placeholder(shape=[], name='empty_%d' % r, dtype=tf.bool)
+                             for r in range(num_relations)]
+            labels_input = tf.placeholder(shape=[None], name='corrupt', dtype=tf.float32)
         print('Building Graph...')
-        predicts, embed_normalize, optimizer, embeddings = ntn_model.build_graph(
-            batch_placeholders, corrupt_placeholders, relation_r_empty, num_entities,
-            num_relations, embed_size, slice_size, lambda_para, learning_rate)
+        predicts, embed_normalize, optimizer, loss, _, summary = ntn_model.build_graph(
+            batch_input, labels_input, r_empty_input, num_entities,
+            num_relations, rank, slice_size, lambda_para, learning_rate)
 
         saver = tf.train.Saver(tf.trainable_variables())
         sess = tf.Session()
@@ -56,63 +73,40 @@ def run_training():
         for step in range(1, num_iter+1):
             print('Iter No.%d' % step)
             print('Get batch')
-            batch, corrupt = make_corrupt_for_train(database.get_train_batch(batch_size), database,
-                                                    num_entities, corrupt_size_train)
-            batch_list, corrupt_list, empty_r = make_split(batch, corrupt, num_relations,
-                                                           make_zero_in_extra_list=True)
-            feed_dict = fill_feed_dict([batch_placeholders, corrupt_placeholders, relation_r_empty],
-                                       [batch_list, corrupt_list, empty_r], num_relations)
+            batch, labels = make_corrupt(database.get_train_batch(batch_size), database,
+                                         num_entities, corrupt_size_train)
+            batch_list, labels, r_empty = make_split(batch, labels, num_relations)
+            labels = np.hstack(labels)
+            feed_dict = fill_feed_dict([batch_input, r_empty_input], [batch_list, r_empty],
+                                       [labels_input], [labels], num_relations)
             print('Training...')
-            sess.run(optimizer, feed_dict=feed_dict)
+            _, l = sess.run([optimizer, loss], feed_dict=feed_dict)
             sess.run(embed_normalize)
+            print('loss ', l)
 
             if step % report_per_iter == 0:
-                print('Evaluating...')
+                print('Evaluating on training set...')
+                train_valid_set, train_valid_labels = make_corrupt(database.get_train_batch(batch_size), database,
+                                                                   num_entities, corrupt_size_eval)
+                ntn_evaluation(train_valid_set, train_valid_labels, num_relations, sess, predicts,
+                               batch_input, labels_input, r_empty_input)
 
-                # Evaluation on one batch of train set.
-                valid_set, labels = make_corrupt_for_eval(database.get_train_batch(batch_size), database,
-                                                          num_entities, corrupt_size_eval)
-                valid_list, label_list, empty_r = make_split(valid_set, labels, num_relations)
-                labels = np.hstack(label_list)
-
-                feed_dict = fill_feed_dict([batch_placeholders, relation_r_empty],
-                                           [valid_list, empty_r], num_relations)
-                valid_predicts = sess.run(predicts, feed_dict=feed_dict)
-
-                mrr, hit_at_10, auc_pr, ap, prec = metrics_in_a_batch(valid_predicts, labels)
-                print("Train batch evaluation:  mmr: %f, hit@10: %f, auc_pr: %f, ap: %f, prec: %f" %
-                      (mrr, hit_at_10, auc_pr, ap, prec))
-
-                # Evaluation on validation set.
-                valid_set, labels = make_corrupt_for_eval(database.get_valid_set(), database,
-                                                          num_entities, corrupt_size_eval)
-                valid_list, label_list, empty_r = make_split(valid_set, labels, num_relations)
-                labels = np.hstack(label_list)
-
-                feed_dict = fill_feed_dict([batch_placeholders, relation_r_empty],
-                                           [valid_list, empty_r], num_relations)
-                valid_predicts = sess.run(predicts, feed_dict=feed_dict)
-                mrr, hit_at_10, auc_pr, ap, prec = metrics_in_a_batch(valid_predicts, labels)
-                print("Validation  evaluation:  mmr: %f, hit@10: %f, auc_pr: %f, ap: %f, prec: %f" %
-                      (mrr, hit_at_10, auc_pr, ap, prec))
+                print('Evaluating on validation set...')
+                valid_set, valid_labels = make_corrupt(database.get_valid_set(), database,
+                                                       num_entities, corrupt_size_eval)
+                ntn_evaluation(valid_set, valid_labels, num_relations, sess, predicts,
+                               batch_input, labels_input, r_empty_input)
 
             if step % save_per_iter == 0:
                 print('Saving model')
                 saver.save(sess, './tmp/saved_model', global_step=step)
 
         # Evaluation on test set.
-        valid_set, labels = make_corrupt_for_eval(database.get_test_set(), database,
-                                                  num_entities, corrupt_size_eval)
-        valid_list, label_list, empty_r = make_split(valid_set, labels, num_relations)
-        labels = np.hstack(label_list)
-
-        feed_dict = fill_feed_dict([batch_placeholders, relation_r_empty],
-                                   [valid_list, empty_r], num_relations)
-        test_predicts = sess.run(predicts, feed_dict)
-
-        mrr, hit_at_10, auc_pr, ap, prec = metrics_in_a_batch(test_predicts, labels)
-        print("Final evaluation-------\nTrain:  mmr: %f, hit@10: %f, auc_pr: %f, ap: %f, prec: %f" %
-              (mrr, hit_at_10, auc_pr, ap, prec))
+        print('Final test set evaluation--------------------------')
+        test_set, test_labels = make_corrupt(database.get_test_set(), database,
+                                             num_entities, corrupt_size_eval)
+        ntn_evaluation(test_set, test_labels, num_relations, sess, predicts,
+                       batch_input, labels_input, r_empty_input)
 
 
 if __name__ == "__main__":

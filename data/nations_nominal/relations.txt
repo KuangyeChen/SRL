@@ -1,3 +1,5 @@
+GDP_per_capita
+gross_domestic_product_per_capita
 Relemigrants
 Relintergovorgs
 Embassy

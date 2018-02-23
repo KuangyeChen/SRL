@@ -3,18 +3,16 @@ import tensorflow as tf
 __all__ = ['build_graph']
 
 
-def build_graph(batch_placeholders, corrupt_placeholders, relation_r_empty,
-                num_entities, num_relations, embedding_size,
-                num_slice, lambda_para, learning_rate):
+def build_graph(batch, labels, relation_r_empty, num_entities, num_relations,
+                embedding_size, num_slice, lambda_para):
     """
     Build a Neural Tensor Network in the default graph.
     See also: Socher, Richard, et al. "Reasoning with neural tensor networks for knowledge base completion."
               Advances in neural information processing systems. 2013.
 
-    :param batch_placeholders: List of placeholders.
-                               Holding triples for corresponding relation r.
-    :param corrupt_placeholders: List of placeholders.
-                                 Holding corrupted e2 for corresponding item in batch_placeholders.
+    :param batch: List of placeholders.
+                  Holding triples for corresponding relation r.
+    :param labels: 1D array of labels.
     :param relation_r_empty: List of placeholders.
                              Indicating if input has any triples involving relation r.
     :param num_entities: Number of entities.
@@ -47,60 +45,51 @@ def build_graph(batch_placeholders, corrupt_placeholders, relation_r_empty,
                               name='u_%d' % r)
                   for r in range(num_relations)]
 
-    predicts = []
-    predicts_corrupt = []
+    scores = []
     for r in range(num_relations):
         with tf.name_scope('ntn_input/'):
-            e1_id, real_e2_id = tf.split(batch_placeholders[r], 2, axis=1)
-            fake_e2_id = corrupt_placeholders[r]
+            e1_id, e2_id = tf.split(batch[r], 2, axis=1)
             e1 = tf.squeeze(tf.gather(embeddings_t, e1_id, axis=1), [2], name='e1')
-            real_e2 = tf.squeeze(tf.gather(embeddings_t, real_e2_id, axis=1), [2], name='true_e2')
-            fake_e2 = tf.gather(embeddings_t, fake_e2_id, axis=1, name='fake_e2')
+            e2 = tf.squeeze(tf.gather(embeddings_t, e2_id, axis=1), [2], name='true_e2')
 
         with tf.name_scope('Bilinear_product/'):
-            real_bilinear_product = []
-            fake_bilinear_product = []
+            bilinear_product = []
             for slice_i in range(num_slice):
-                real_bilinear_product.append(tf.reduce_sum(
-                    e1 * tf.matmul(w_list[r][:, :, slice_i], real_e2), axis=0))
-                fake_bilinear_product.append(tf.reduce_sum(
-                    e1 * tf.matmul(w_list[r][:, :, slice_i], fake_e2), axis=0))
-            real_bilinear_product = tf.stack(real_bilinear_product, name='real_bilinear_product')
-            fake_bilinear_product = tf.stack(fake_bilinear_product, name='fake_bilinear_product')
+                bilinear_product.append(tf.reduce_sum(
+                    e1 * tf.matmul(w_list[r][:, :, slice_i], e2), axis=0))
+            bilinear_product = tf.stack(bilinear_product, name='bilinear_product')
 
         with tf.name_scope('Standard_layer/'):
-            real_std_layer = tf.matmul(v_list[r], tf.concat([e1, real_e2], axis=0), name='real_std_layer')
-            fake_std_layer = tf.matmul(v_list[r], tf.concat([e1, fake_e2], axis=0), name='fake_std_layer')
+            std_layer = tf.matmul(v_list[r], tf.concat([e1, e2], axis=0), name='std_layer')
         with tf.name_scope('Preactivation/'):
-            real_preactivation = real_bilinear_product + real_std_layer + b_list[r]
-            fake_preactivation = fake_bilinear_product + fake_std_layer + b_list[r]
+            preactivation = bilinear_product + std_layer + b_list[r]
 
         with tf.name_scope('Activation/'):
-            real_activation = tf.tanh(real_preactivation, name='real_activation')
-            fake_activation = tf.tanh(fake_preactivation, name='fake_activation')
+            activation = tf.tanh(preactivation, name='activation')
         with tf.name_scope('Accumulation/'):
             # If relation r is actually not involved in this batch, store no results for relation r.
-            real_score = tf.cond(relation_r_empty[r],
-                                 lambda: tf.constant([]),
-                                 lambda: tf.reshape(tf.matmul(u_list[r], real_activation), shape=[-1]),
-                                 name='real_score')
-            fake_score = tf.cond(relation_r_empty[r],
-                                 lambda: tf.constant([]),
-                                 lambda: tf.reshape(tf.matmul(u_list[r], fake_activation), shape=[-1]),
-                                 name='fake_score')
-
-        predicts.append(real_score)
-        predicts_corrupt.append(fake_score)
+            score = tf.cond(relation_r_empty[r],
+                            lambda: tf.constant([]),
+                            lambda: tf.reshape(tf.matmul(u_list[r], activation), shape=[-1]))
+        scores.append(score)
 
     with tf.name_scope('Predicts'):
-        predicts = tf.concat(predicts, axis=0, name='predicts')
-        predicts_corrupt = tf.concat(predicts_corrupt, axis=0, name='predicts_corrupt')
+        score = tf.concat(scores, axis=0, name='score')
+        predicts = tf.sigmoid(score, name='predicts')
 
     with tf.name_scope('Loss_function'):
-        main_loss = tf.reduce_sum(tf.maximum(predicts_corrupt - predicts + 1, 0), name='main_loss')
+        main_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=score),
+                                   name='main_loss')
         weight_decay = sum([tf.nn.l2_loss(var) for var in tf.trainable_variables()])
         loss = main_loss + lambda_para * weight_decay
-    with tf.name_scope('Optimizer'):
-        optimizer = tf.train.AdagradOptimizer(learning_rate).minimize(loss)
+        mean_loss = main_loss / tf.cast(tf.shape(labels)[0], tf.float32) + lambda_para * weight_decay
 
-    return predicts, embedding_normalize, optimizer, embeddings
+    with tf.name_scope('Optimizer'):
+        optimizer = tf.train.AdamOptimizer().minimize(loss)
+
+    with tf.name_scope('Summary/'):
+        tf.summary.scalar('Loss', mean_loss)
+        tf.summary.histogram('Embeddings', embeddings)
+        merged_summary = tf.summary.merge_all()
+
+    return predicts, embedding_normalize, optimizer, mean_loss, embeddings, merged_summary

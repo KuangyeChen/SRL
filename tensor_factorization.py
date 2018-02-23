@@ -22,15 +22,24 @@ def run_rescal():
     matrix_list = make_sparse_matrix_for_rescal(train_set, num_entities, num_relations)
     a_matrix, r_tensor = rescal(matrix_list, rank)
 
-    test_batch, labels = make_corrupt_for_eval(database.get_test_set(), database,
-                                               num_entities, corrupt_size)
+    test_batch, labels = make_corrupt(database.get_test_set(), database,
+                                      num_entities, corrupt_size)
     predicts = []
     for triple in test_batch:
         predicts.append(rescal_eval(a_matrix, r_tensor, triple))
 
-    mrr, hit_at_10, auc_pr, ap, prec = metrics_in_a_batch(np.array(predicts), np.array(labels))
-    print("Evaluation-------\nTrain:  mmr: %f, hit@10: %f, auc_pr: %f, ap: %f, prec: %f" %
-          (mrr, hit_at_10, auc_pr, ap, prec))
+    train_predicts = []
+    for triple in train_set:
+        train_predicts.append(rescal_eval(a_matrix, r_tensor, triple))
+    # print(train_predicts)
+    # print(np.percentile(train_predicts, 20))
+    # print(predicts)
+    # print(labels)
+    mrr, hit_at_10, auc_pr, ap, prec, num_pos = metrics_in_a_batch(np.array(predicts),
+                                                                   np.array(labels))
+    print("Evaluation-------\n")
+    print("Train:  mmr: %.4f, hit@10: %.4f, auc_pr: %.4f, ap: %.4f, positive predict: %d, prec: %.4f" %
+          (mrr, hit_at_10, auc_pr, ap, num_pos, prec))
 
 
 def run_tucker():
@@ -44,15 +53,17 @@ def run_tucker():
     tensor = make_tensor_from_triple_list(train_set, num_entities, num_relations)
     predict_tensor = tucker(tensor, rank)
 
-    test_batch, labels = make_corrupt_for_eval(database.get_test_set(), database,
-                                               num_entities, corrupt_size)
+    test_batch, labels = make_corrupt(database.get_test_set(), database,
+                                      num_entities, corrupt_size)
     predicts = []
     for triple in test_batch:
         predicts.append(predict_tensor[triple[0], triple[1], triple[2]])
 
-    mrr, hit_at_10, auc_pr, ap, prec = metrics_in_a_batch(np.array(predicts), np.array(labels))
-    print("Evaluation-------\nTrain:  mmr: %f, hit@10: %f, auc_pr: %f, ap: %f, prec: %f" %
-          (mrr, hit_at_10, auc_pr, ap, prec))
+    mrr, hit_at_10, auc_pr, ap, prec, num_pos = metrics_in_a_batch(np.array(predicts),
+                                                                   np.array(labels))
+    print("Evaluation-------\n")
+    print("Train:  mmr: %.4f, hit@10: %.4f, auc_pr: %.4f, ap: %.4f, positive predict: %d, prec: %.4f" %
+          (mrr, hit_at_10, auc_pr, ap, num_pos, prec))
 
 
 def run_cp():
@@ -66,15 +77,17 @@ def run_cp():
     tensor = make_tensor_from_triple_list(train_set, num_entities, num_relations)
     predict_tensor = cp(tensor, rank)
 
-    test_batch, labels = make_corrupt_for_eval(database.get_test_set(), database,
-                                               num_entities, corrupt_size)
+    test_batch, labels = make_corrupt(database.get_test_set(), database,
+                                      num_entities, corrupt_size)
     predicts = []
     for triple in test_batch:
         predicts.append(predict_tensor[triple[0], triple[1], triple[2]])
 
-    mrr, hit_at_10, auc_pr, ap, prec = metrics_in_a_batch(np.array(predicts), np.array(labels))
-    print("Evaluation-------\nTrain:  mmr: %f, hit@10: %f, auc_pr: %f, ap: %f, prec: %f" %
-          (mrr, hit_at_10, auc_pr, ap, prec))
+    mrr, hit_at_10, auc_pr, ap, prec, num_pos = metrics_in_a_batch(np.array(predicts),
+                                                                   np.array(labels))
+    print("Evaluation-------\n")
+    print("Train:  mmr: %.4f, hit@10: %.4f, auc_pr: %.4f, ap: %.4f, positive predict: %d, prec: %.4f" %
+          (mrr, hit_at_10, auc_pr, ap, num_pos, prec))
 
 
 if __name__ == '__main__':
