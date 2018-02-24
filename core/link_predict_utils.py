@@ -1,9 +1,11 @@
 from sklearn.metrics import auc, precision_recall_curve, average_precision_score, precision_score
 import numpy as np
+import collections
 
 __all__ = ['make_corrupt',
            'make_split',
-           'metrics_in_a_batch']
+           'metrics_in_a_batch',
+           'report_metrics']
 
 
 def make_corrupt_for_train(one_batch, database, num_entities, corrupt_size):
@@ -109,6 +111,8 @@ def metrics_in_a_batch(predicts, labels, threshold=0.5):
     Calculate the metrics:
         Mean Reciprocal Rank
         Hit at 10
+        Hit at 5
+        Hit at 1
         Area under precision recall curve
         Average precision score
         Precision at threshold
@@ -116,22 +120,58 @@ def metrics_in_a_batch(predicts, labels, threshold=0.5):
     :param predicts: Predicts for each triple.
     :param labels: True labels for each triple.
     :param threshold: Threshold for decision.
-    :return: MRR, HIT@10, AUC_PR, AP, PRC_0.5.
+    :return: A namedtuple containing all metrics
     """
+
     if type(predicts) != np.ndarray or type(labels) != np.ndarray:
         raise TypeError("Predicts and labels should be numpy ndarray")
 
     predicts_list = np.split(predicts, np.squeeze(np.argwhere(labels == 1))[1:])
-    # print(predicts_list[0])
-    # print(len(predicts_list[0]) - predicts_list[0].argsort().argsort()[0])
+
     mrr = 1 / np.array([len(one_predict) - one_predict.argsort().argsort()[0] for one_predict in predicts_list])
     mrr = mrr.mean()
+
     hit_at_10 = np.array([one_predict.argsort().argsort()[0] >= len(one_predict) - 10 for one_predict in predicts_list])
     hit_at_10 = hit_at_10.mean()
+
+    hit_at_5 = np.array([one_predict.argsort().argsort()[0] >= len(one_predict) - 5 for one_predict in predicts_list])
+    hit_at_5 = hit_at_5.mean()
+
+    hit_at_1 = np.array([one_predict.argsort().argsort()[0] >= len(one_predict) - 1 for one_predict in predicts_list])
+    hit_at_1 = hit_at_1.mean()
+
     pos_predict = predicts > threshold
     precision = precision_score(labels, pos_predict)
-    num_pos = sum(pos_predict)
+    tp_fp_sum = sum(pos_predict)
+
     precision_list, recall_list, _ = precision_recall_curve(labels, predicts)
-    return (mrr, hit_at_10, auc(recall_list, precision_list),
-            average_precision_score(labels, predicts),
-            precision, num_pos)
+
+    metrics = collections.namedtuple('metrics', ['mrr',
+                                                 'hit_at_10',
+                                                 'hit_at_5',
+                                                 'hit_at_1',
+                                                 'tp_fp_sum',
+                                                 'precision',
+                                                 'auc_pr',
+                                                 'ap'])
+
+    return metrics(mrr, hit_at_10, hit_at_5, hit_at_1,
+                   tp_fp_sum, precision,
+                   auc(recall_list, precision_list),
+                   average_precision_score(labels, predicts))
+
+
+def report_metrics(metrics):
+    """
+    Print metrics.
+
+    :param metrics: A namedtuple containing all metrics
+    :return: None
+    """
+
+    print("MRR: %.4f, HIT@10: %.4f, HIT@5: %.4f, HIT@1: %.4f" % (
+        metrics.mrr, metrics.hit_at_10, metrics.hit_at_5, metrics.hit_at_1))
+    print("AUC_PR: %.4f, Average Precision: %.4f" % (metrics.auc_pr, metrics.ap))
+    print('TP+FP@0.5: %d, Precision@0.5: %.4f' % (metrics.tp_fp_sum, metrics.precision))
+
+

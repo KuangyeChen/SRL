@@ -5,7 +5,7 @@ from core.knowledge_graph import KnowledgeGraph
 from core.link_predict_utils import *
 from core.factorizations import *
 
-dataset = 'data/kin'
+dataset = 'data/kin_nominal'
 test_percent = 0.1
 corrupt_size = 100
 rank = 100
@@ -35,11 +35,7 @@ def run_rescal():
     # print(np.percentile(train_predicts, 20))
     # print(predicts)
     # print(labels)
-    mrr, hit_at_10, auc_pr, ap, prec, num_pos = metrics_in_a_batch(np.array(predicts),
-                                                                   np.array(labels))
-    print("Evaluation-------\n")
-    print("Train:  mmr: %.4f, hit@10: %.4f, auc_pr: %.4f, ap: %.4f, positive predict: %d, prec: %.4f" %
-          (mrr, hit_at_10, auc_pr, ap, num_pos, prec))
+    report_metrics(metrics_in_a_batch(np.array(predicts), np.array(labels)))
 
 
 def run_tucker():
@@ -59,11 +55,7 @@ def run_tucker():
     for triple in test_batch:
         predicts.append(predict_tensor[triple[0], triple[1], triple[2]])
 
-    mrr, hit_at_10, auc_pr, ap, prec, num_pos = metrics_in_a_batch(np.array(predicts),
-                                                                   np.array(labels))
-    print("Evaluation-------\n")
-    print("Train:  mmr: %.4f, hit@10: %.4f, auc_pr: %.4f, ap: %.4f, positive predict: %d, prec: %.4f" %
-          (mrr, hit_at_10, auc_pr, ap, num_pos, prec))
+    report_metrics(metrics_in_a_batch(np.array(predicts), np.array(labels)))
 
 
 def run_cp():
@@ -83,11 +75,7 @@ def run_cp():
     for triple in test_batch:
         predicts.append(predict_tensor[triple[0], triple[1], triple[2]])
 
-    mrr, hit_at_10, auc_pr, ap, prec, num_pos = metrics_in_a_batch(np.array(predicts),
-                                                                   np.array(labels))
-    print("Evaluation-------\n")
-    print("Train:  mmr: %.4f, hit@10: %.4f, auc_pr: %.4f, ap: %.4f, positive predict: %d, prec: %.4f" %
-          (mrr, hit_at_10, auc_pr, ap, num_pos, prec))
+    report_metrics(metrics_in_a_batch(np.array(predicts), np.array(labels)))
 
 
 if __name__ == '__main__':
