@@ -128,16 +128,20 @@ def metrics_in_a_batch(predicts, labels, threshold=0.5):
 
     predicts_list = np.split(predicts, np.squeeze(np.argwhere(labels == 1))[1:])
 
-    mrr = 1 / np.array([len(one_predict) - one_predict.argsort().argsort()[0] for one_predict in predicts_list])
+    mrr = 1 / np.array([len(one_predict) - one_predict.argsort().argsort()[0]
+                        for one_predict in predicts_list])
     mrr = mrr.mean()
 
-    hit_at_10 = np.array([one_predict.argsort().argsort()[0] >= len(one_predict) - 10 for one_predict in predicts_list])
+    hit_at_10 = np.array([one_predict.argsort().argsort()[0] >= len(one_predict) - 10
+                          for one_predict in predicts_list])
     hit_at_10 = hit_at_10.mean()
 
-    hit_at_5 = np.array([one_predict.argsort().argsort()[0] >= len(one_predict) - 5 for one_predict in predicts_list])
+    hit_at_5 = np.array([one_predict.argsort().argsort()[0] >= len(one_predict) - 5
+                         for one_predict in predicts_list])
     hit_at_5 = hit_at_5.mean()
 
-    hit_at_1 = np.array([one_predict.argsort().argsort()[0] >= len(one_predict) - 1 for one_predict in predicts_list])
+    hit_at_1 = np.array([one_predict.argsort().argsort()[0] >= len(one_predict) - 1
+                         for one_predict in predicts_list])
     hit_at_1 = hit_at_1.mean()
 
     pos_predict = predicts > threshold
@@ -173,5 +177,3 @@ def report_metrics(metrics):
         metrics.mrr, metrics.hit_at_10, metrics.hit_at_5, metrics.hit_at_1))
     print("AUC_PR: %.4f, Average Precision: %.4f" % (metrics.auc_pr, metrics.ap))
     print('TP+FP@0.5: %d, Precision@0.5: %.4f' % (metrics.tp_fp_sum, metrics.precision))
-
-

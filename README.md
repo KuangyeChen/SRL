@@ -31,3 +31,8 @@ Change hyperparameters directly in scripts.
 
 Change hyperparameters directly in scripts.<br>
 During the training, run `tensorboard --logdir=tmp/log/` for monitoring.
+
+
+## Nonimal Data Experiment
+Experiments are in IPython notebook `nominal_experiment.ipynb`.<br>
+ER-MLP and NTN trained for kin_nominal dataset are stored in `saved_model/`
