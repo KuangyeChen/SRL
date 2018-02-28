@@ -1,24 +1,26 @@
 import tensorflow as tf
+import numpy as np
 import collections
-from core.link_predict_utils import metrics_in_a_batch, report_metrics
+from core.link_predict_utils import *
 
 __all__ = ['report_log_metrics',
            'ntn_model',
-           'er_mlp_model']
+           'er_mlp_model',
+           'NTN_Handle',
+           'ER_MLP_Handle']
 
 
 def report_log_metrics(predicts, labels, logger, step):
     """
     Print and log metrics with TensorFlow summary.
 
-    :param predicts: Predictions in probability.
-    :param labels: True labels.
-    :param logger: TensorFlow's FileWriter.
-    :param step: Global step at training.
-    :return: None
+    :param np.ndarray predicts: Predictions in probability.
+    :param np.ndarray labels: True labels.
+    :param tf.summary.FileWriter logger: TensorFlow's FileWriter.
+    :param int step: Global step at training.
     """
 
-    metrics = metrics_in_a_batch(predicts, labels)
+    metrics = metrics_in_a_batch(predicts, labels)                          # type: Metrics
     logger.add_summary(tf.Summary(
         value=[tf.Summary.Value(tag='Summary/MRR', simple_value=metrics.mrr),
                tf.Summary.Value(tag='Summary/HIT@10', simple_value=metrics.hit_at_10),
@@ -30,18 +32,19 @@ def report_log_metrics(predicts, labels, logger, step):
     report_metrics(metrics)
 
 
-def ntn_model(num_entities, num_relations, rank, num_slice, lambda_para):
+def ntn_model(num_entities, num_relations, rank, num_slice, lambda_para, pos_weight):
     """
     Build a Neural Tensor Network in the default graph.
     See also: Socher, Richard, et al. "Reasoning with neural tensor networks for knowledge base completion."
               Advances in neural information processing systems. 2013.
 
-    :param num_entities: Number of entities.
-    :param num_relations: Number of relations
-    :param rank: Length of embedding vector.
-    :param num_slice: Number of slices used in bilinear term.
-    :param lambda_para: Coefficient for L2 weight decay.
-    :return: A handle containing references for training and evaluation.
+    :param int num_entities: Number of entities.
+    :param int num_relations: Number of relations
+    :param int rank: Length of embedding vector.
+    :param int num_slice: Number of slices used in bilinear term.
+    :param float lambda_para: Coefficient for L2 weight decay.
+    :param float pos_weight: Weight for positive sample in loss function.
+    :return: A NTN_Handle containing references for training and evaluation.
     """
 
     with tf.name_scope('Placeholders/'):
@@ -103,7 +106,9 @@ def ntn_model(num_entities, num_relations, rank, num_slice, lambda_para):
         predicts = tf.sigmoid(score, name='predicts')
 
     with tf.name_scope('Loss_function/'):
-        main_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_input, logits=score),
+        main_loss = tf.reduce_mean(tf.nn.weighted_cross_entropy_with_logits(targets=labels_input,
+                                                                            logits=score,
+                                                                            pos_weight=pos_weight),
                                    name='main_loss')
         weight_decay = sum([tf.nn.l2_loss(var) for var in tf.trainable_variables()])
         loss = main_loss + lambda_para * weight_decay
@@ -118,30 +123,32 @@ def ntn_model(num_entities, num_relations, rank, num_slice, lambda_para):
         tf.summary.histogram('Embeddings', embeddings)
         merged_summary = tf.summary.merge_all()
 
-    handle = collections.namedtuple('handle', ['batch_input',
-                                               'labels_input',
-                                               'r_empty_input',
-                                               'predicts',
-                                               'loss',
-                                               'optimize',
-                                               'embeddings',
-                                               'summary'])
-
-    return handle(batch_input, labels_input, r_empty_input, predicts,
-                  loss, optimize_normalize, embeddings, merged_summary)
+    return NTN_Handle(batch_input, labels_input, r_empty_input, predicts,
+                      loss, optimize_normalize, embeddings, merged_summary)
 
 
-def er_mlp_model(num_entities, num_relations, rank_e, rank_r, num_slice, lambda_para):
+NTN_Handle = collections.namedtuple('ntn_handle', ['batch_input',
+                                                   'labels_input',
+                                                   'r_empty_input',
+                                                   'predicts',
+                                                   'loss',
+                                                   'optimize',
+                                                   'embeddings',
+                                                   'summary'])
+
+
+def er_mlp_model(num_entities, num_relations, rank_e, rank_r, num_slice, lambda_para, pos_weight):
     """
     Build a ER_MLP in default graph.
 
-    :param num_entities: Number of entities
-    :param num_relations: Number of relations
-    :param rank_e: Length of embedding vector for entities.
-    :param rank_r: Length of embedding vector for relations.
-    :param num_slice: Size of the hidden layer.
-    :param lambda_para: Coefficient for L2 weight decay.
-    :return: A handle containing references for training and evaluation.
+    :param int num_entities: Number of entities
+    :param int num_relations: Number of relations
+    :param int rank_e: Length of embedding vector for entities.
+    :param int rank_r: Length of embedding vector for relations.
+    :param int num_slice: Size of the hidden layer.
+    :param float lambda_para: Coefficient for L2 weight decay.
+    :param float pos_weight: Weight for positive sample in loss function.
+    :return: A ER_MLP_Handle containing references for training and evaluation.
     """
 
     with tf.name_scope('Placeholders'):
@@ -182,7 +189,9 @@ def er_mlp_model(num_entities, num_relations, rank_e, rank_r, num_slice, lambda_
         predicts = tf.sigmoid(score, name='predicts')
 
     with tf.name_scope('Loss_function'):
-        main_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels_input, logits=score),
+        main_loss = tf.reduce_mean(tf.nn.weighted_cross_entropy_with_logits(targets=labels_input,
+                                                                            logits=score,
+                                                                            pos_weight=pos_weight),
                                    name='main_loss')
         weight_decay = sum([tf.nn.l2_loss(var) for var in tf.trainable_variables()])
         loss = main_loss + lambda_para * weight_decay
@@ -199,14 +208,15 @@ def er_mlp_model(num_entities, num_relations, rank_e, rank_r, num_slice, lambda_
         tf.summary.histogram('Embedding_relations', embeddings_r)
         merged_summary = tf.summary.merge_all()
 
-    handle = collections.namedtuple('handle', ['batch_input',
-                                               'labels_input',
-                                               'predicts',
-                                               'loss',
-                                               'optimize',
-                                               'embeddings_e',
-                                               'embeddings_r',
-                                               'summary'])
+    return ER_MLP_Handle(batch_input, labels_input, predicts, loss, optimize_normalize,
+                         embeddings_e, embeddings_r, merged_summary)
 
-    return handle(batch_input, labels_input, predicts, loss, optimize_normalize,
-                  embeddings_e, embeddings_r, merged_summary)
+
+ER_MLP_Handle = collections.namedtuple('er_mlp_handle', ['batch_input',
+                                                         'labels_input',
+                                                         'predicts',
+                                                         'loss',
+                                                         'optimize',
+                                                         'embeddings_e',
+                                                         'embeddings_r',
+                                                         'summary'])

@@ -3,24 +3,26 @@
 import tensorflow as tf
 import numpy as np
 import shutil
+import os
 from core.neural_networks import er_mlp_model, report_log_metrics
 from core.knowledge_graph import KnowledgeGraph
 from core.link_predict_utils import *
 
 dataset = 'data/kin_nominal'
 # Hyperparameters
-num_slice = 60
+num_slice = 100
 rank_e = 100
-rank_r = 20
+rank_r = 100
 valid_percent = 0.05
 test_percent = 0.05
-lambda_para = 0.0001
+lambda_para = 1e-4
+pos_weight = 10
 
 # Parameters for training
-max_iter = 20000
+max_iter = 100000
 corrupt_size_train = 10
 corrupt_size_eval = 50
-batch_size = 6000
+batch_size = 9000
 save_per_iter = 300
 eval_per_iter = 100
 
@@ -32,10 +34,11 @@ def main():
     max_eval_no_improve = 10
 
     # Clean tmp files
-    decide = input('Clean tmp/ folder? (y/n)')
-    if decide.lower() == 'y' or decide.lower() == 'yes':
-        shutil.rmtree('./tmp/')
-        print('tmp/ cleaned.')
+    if os.path.exists('./tmp'):
+        decide = input('Clean tmp/ folder? (y/n)')
+        if decide.lower() == 'y' or decide.lower() == 'yes':
+            shutil.rmtree('./tmp/')
+            print('tmp/ cleaned.')
 
     # Read database
     database = KnowledgeGraph()
@@ -47,7 +50,7 @@ def main():
     with er_mlp_graph.as_default():
         print('Building Graph...')
         handle = er_mlp_model(database.number_of_entities(), database.number_of_relations(),
-                              rank_e, rank_r, num_slice, lambda_para)
+                              rank_e, rank_r, num_slice, lambda_para, pos_weight)
         print("Graph built.")
         saver = tf.train.Saver(tf.trainable_variables())
         sess = tf.Session()
@@ -114,9 +117,7 @@ def main():
 
 
 def run_once(data, database, sess, handle, corrupt_size, if_test=True):
-    num_entities = database.number_of_entities()
-
-    batch, labels = make_corrupt(data, database, num_entities, corrupt_size)
+    batch, labels = make_corrupt(data, database, corrupt_size)
     feed_dict = {handle.batch_input: batch,
                  handle.labels_input: labels}
 

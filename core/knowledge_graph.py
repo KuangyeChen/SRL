@@ -1,7 +1,11 @@
 import numpy as np
+from typing import Tuple, Sequence, List, Set
 from os.path import join as path_join
 
-__all__ = ['KnowledgeGraph']
+__all__ = ['KnowledgeGraph',
+           'Triple']
+
+Triple = Tuple[int, int, int]
 
 
 class KnowledgeGraph(object):
@@ -11,14 +15,14 @@ class KnowledgeGraph(object):
     Stored information:
         All entities names,
         All relations names,
-        All triples representing a existing relation.
+        All triples representing existing relations.
 
     Triples are stored in form (e1, e2, r)
-    e.g. `Disease_or_Syndrome Affects Plant`
+    e.g. A Triple: `Disease_or_Syndrome Affects Plant`
          `Disease_or_Syndrome` is entity 2.
          `Plant` is entity 5.
          `Affects` is relation 1.
-         This triple are stored as (2, 5, 1).
+         This triple is stored as (2, 5, 1).
     """
 
     def __init__(self):
@@ -26,13 +30,13 @@ class KnowledgeGraph(object):
         Create empty knowledge graph.
         """
 
-        self.__entities = []
-        self.__relations = []
-        self.__triples_set = set()
-        self.__triples_array = np.array([])
-        self.__test_set_idx = []
-        self.__train_set_idx = []
-        self.__valid_set_idx = []
+        self.__entities = []                    # type: List[str]
+        self.__relations = []                   # type: List[str]
+        self.__triples_set = set()              # type: Set[Triple]
+        self.__triples_array = np.array([])     # type: np.ndarray
+        self.__test_set_idx = []                # type: List[int]
+        self.__train_set_idx = []               # type: List[int]
+        self.__valid_set_idx = []               # type: List[int]
 
     def reset(self):
         """
@@ -51,8 +55,8 @@ class KnowledgeGraph(object):
         """
         Split the stored triples into train, validation and test set.
 
-        :param valid_percent: Percentage of validation set.
-        :param test_percent: Percentage of test set.
+        :param float valid_percent: Percentage of validation set.
+        :param float test_percent: Percentage of test set.
         """
 
         test_size = int(len(self.__triples_set) * test_percent)
@@ -66,8 +70,8 @@ class KnowledgeGraph(object):
         """
         Make a batch of triples for training.
 
-        :param batch_size: Size of the batch.
-        :return: A numpy array containing the selected triples.
+        :param int batch_size: Size of the batch.
+        :return: A np.ndarray containing the selected triples.
         """
 
         all_idx = np.random.permutation(len(self.__train_set_idx))
@@ -77,7 +81,7 @@ class KnowledgeGraph(object):
         """
         Return the train set of triples.
 
-        :return: A numpy array containing the selected triples.
+        :return: A np.ndarray containing the selected triples.
         """
 
         return self.__triples_array[self.__train_set_idx]
@@ -86,7 +90,7 @@ class KnowledgeGraph(object):
         """
         Return the test set of triples.
 
-        :return: A numpy array containing the selected triples.
+        :return: A np.ndarray containing the selected triples.
         """
 
         return self.__triples_array[self.__test_set_idx]
@@ -95,7 +99,7 @@ class KnowledgeGraph(object):
         """
         Return the validation set of triples.
 
-        :return: A numpy array containing the selected triples.
+        :return: A np.ndarray containing the selected triples.
         """
 
         return self.__triples_array[self.__valid_set_idx]
@@ -104,7 +108,7 @@ class KnowledgeGraph(object):
         """
         Return all triples.
 
-        :return: A numpy array containing all triples.
+        :return: A np.ndarray containing all triples.
         """
 
         return np.array(list(self.__triples_set))
@@ -117,7 +121,7 @@ class KnowledgeGraph(object):
             entities.txt: each row is a entity name. e.g. `Plant`
             relations.txt: each row is a relation name. e.g. `Affects`
 
-        :param path: A string with the path of the directory contains the txt files.
+        :param str path: The path of the directory contains the txt files.
         """
 
         with open(path_join(path, 'entities.txt'), 'r') as fin:
@@ -140,18 +144,17 @@ class KnowledgeGraph(object):
     def add_entities(self, entities_list):
         """
         Add entities to knowledge graph.
-        Input must be a list.
 
-        :param entities_list: List of new entities.
+        :param Sequence[str] entities_list: New entities to add.
         """
-
-        self.__entities = self.__entities + entities_list
+        for entity in entities_list:
+            self.__entities.append(entity)
 
     def add_relations(self, relations_list):
         """
         Add relations to knowledge graph.
-        Input must be a list.
-        :param relations_list: List of new relations.
+
+        :param Sequence[str] relations_list: New relations to add.
         """
 
         self.__relations = self.__relations + relations_list
@@ -162,8 +165,8 @@ class KnowledgeGraph(object):
         Input must be a list.
         Triples must be given in tuple. e.g. (e1, e2, r)
 
-        :param remove_list: List of triples to remove.
-        :param add_list: List of triples to add.
+        :param Sequence[Triple] remove_list: Triples to remove.
+        :param Sequence[Triple] add_list: List of triples to add.
         """
 
         for triple in remove_list:
@@ -172,15 +175,15 @@ class KnowledgeGraph(object):
             self.__triples_set.add(triple)
         self.__triples_array = np.array(list(self.__triples_set))
 
-    def entity_index_to_name(self, i):
+    def entity_index_to_name(self, idx):
         """
         Return the name of ith entity.
 
-        :param i: Index of the wanted entity.
+        :param int idx: Index of the wanted entity.
         :return: Name of the wanted entity.
         """
 
-        return self.__entities[i]
+        return self.__entities[idx]
 
     def number_of_entities(self):
         """
@@ -191,15 +194,15 @@ class KnowledgeGraph(object):
 
         return len(self.__entities)
 
-    def relation_index_to_name(self, i):
+    def relation_index_to_name(self, idx):
         """
         Return the name of ith relation.
 
-        :param i: Index of the wanted relation.
+        :param int idx: Index of the wanted relation.
         :return: Name of the wanted relation.
         """
 
-        return self.__relations[i]
+        return self.__relations[idx]
 
     def number_of_relations(self):
         """
@@ -219,16 +222,15 @@ class KnowledgeGraph(object):
 
         return len(self.__triples_set)
 
-    def check_triple(self, entity1, entity2, relation):
+    def check_triple(self, triple):
         """
         Check if triple (e1, e2, r) exists in knowledge graph.
 
-        :param entity1: e1.
-        :param entity2: e2.
-        :param relation: r.
+        :param Triple triple: e1.
         :return: True or False.
         """
-        return (entity1, entity2, relation) in self.__triples_set
+
+        return triple in self.__triples_set
 
     def to_numpy_array(self):
         """
@@ -236,8 +238,9 @@ class KnowledgeGraph(object):
         T[e1, e2, r] = 1 if (e1, e2, r) exists in knowledge graph.
         T[e1, e2, r] = 0 otherwise.
 
-        :return: tensor T (numpy.ndarray).
+        :return: np.ndarray representing the tensor.
         """
+
         array = np.zeros([len(self.__entities),
                           len(self.__entities),
                           len(self.__relations)])

@@ -2,6 +2,7 @@
 
 import tensorflow as tf
 import shutil
+import os
 from core.neural_networks import ntn_model, report_log_metrics
 from core.knowledge_graph import KnowledgeGraph
 from core.link_predict_utils import *
@@ -12,11 +13,12 @@ slice_size = 1
 rank = 100
 valid_percent = 0.05
 test_percent = 0.05
-lambda_para = 0.0001
+lambda_para = 1e-4
+pos_weight = 10
 
 # Parameters for training
-batch_size = 6000
-max_iter = 20000
+batch_size = 8000
+max_iter = 100000
 corrupt_size_train = 10
 corrupt_size_eval = 100
 save_per_iter = 300
@@ -30,10 +32,11 @@ def main():
     max_eval_no_improve = 10
 
     # Clean tmp files
-    decide = input('Clean tmp/ folder? (y/n)')
-    if decide.lower() == 'y' or decide.lower() == 'yes':
-        shutil.rmtree('./tmp/')
-        print('tmp/ cleaned.')
+    if os.path.exists('./tmp'):
+        decide = input('Clean tmp/ folder? (y/n)')
+        if decide.lower() == 'y' or decide.lower() == 'yes':
+            shutil.rmtree('./tmp/')
+            print('tmp/ cleaned.')
 
     # Read database
     database = KnowledgeGraph()
@@ -45,7 +48,7 @@ def main():
     with ntn_graph.as_default():
         print('Building Graph...')
         handle = ntn_model(database.number_of_entities(), database.number_of_relations(),
-                           rank, slice_size, lambda_para)
+                           rank, slice_size, lambda_para, pos_weight)
         print('Graph built.')
         saver = tf.train.Saver(tf.trainable_variables())
         sess = tf.Session()
@@ -124,10 +127,9 @@ def fill_feed_dict(input_list_r, data_list_r, input_list, data_list, num_relatio
 
 
 def run_once(data, database, sess, handle, corrupt_size, if_test=True):
-    num_entities = database.number_of_entities()
     num_relations = database.number_of_relations()
 
-    batch, labels = make_corrupt(data, database, num_entities, corrupt_size)
+    batch, labels = make_corrupt(data, database, corrupt_size)
     batch_list, labels, r_empty = make_split(batch, labels, num_relations)
     feed_dict = fill_feed_dict([handle.batch_input, handle.r_empty_input],
                                [batch_list,          r_empty],
