@@ -34,6 +34,7 @@ class KnowledgeGraph(object):
         self.__relations = []                   # type: List[str]
         self.__triples_set = set()              # type: Set[Triple]
         self.__triples_array = np.array([])     # type: np.ndarray
+        self.__corrupt_list = []
         self.__test_set_idx = []                # type: List[int]
         self.__train_set_idx = []               # type: List[int]
         self.__valid_set_idx = []               # type: List[int]
@@ -66,7 +67,7 @@ class KnowledgeGraph(object):
         self.__valid_set_idx = all_idx[test_size: test_size + valid_size]
         self.__train_set_idx = all_idx[test_size + valid_size:]
 
-    def get_train_batch(self, batch_size):
+    def get_train_batch(self, batch_size, corrupt_size):
         """
         Make a batch of triples for training.
 
@@ -75,34 +76,64 @@ class KnowledgeGraph(object):
         """
 
         all_idx = np.random.permutation(len(self.__train_set_idx))
-        return self.__triples_array[self.__train_set_idx[all_idx[:batch_size]]]
+        if batch_size > len(self.__train_set_idx):
+            batch_size = len(self.__train_set_idx)
+        data = []
+        labels = []
+        for i in range(batch_size):
+            data.append(self.__triples_array[self.__train_set_idx[all_idx[i]]])
+            data.extend(self.__corrupt_list[self.__train_set_idx[all_idx[i]]][:corrupt_size])
+            labels.append(1)
+            labels.extend([0]*(len(data)-len(labels)))
+        return data, labels
 
-    def get_train_set(self):
+    def get_train_set(self, corrupt_size):
         """
         Return the train set of triples.
 
         :return: A np.ndarray containing the selected triples.
         """
+        data = []
+        labels = []
+        for i in self.__train_set_idx:
+            data.append(self.__triples_array[i])
+            data.extend(self.__corrupt_list[i][:corrupt_size])
+            labels.append(1)
+            labels.extend([0]*(len(data)-len(labels)))
+            
+        return data, labels
 
-        return self.__triples_array[self.__train_set_idx]
-
-    def get_test_set(self):
+    def get_test_set(self, corrupt_size):
         """
         Return the test set of triples.
 
         :return: A np.ndarray containing the selected triples.
         """
 
-        return self.__triples_array[self.__test_set_idx]
+        data = []
+        labels = []
+        for i in self.__test_set_idx:
+            data.append(self.__triples_array[i])
+            data.extend(self.__corrupt_list[i][:corrupt_size])
+            labels.append(1)
+            labels.extend([0]*(len(data)-len(labels)))
+        return data, labels
 
-    def get_valid_set(self):
+    def get_valid_set(self, corrupt_size):
         """
         Return the validation set of triples.
 
         :return: A np.ndarray containing the selected triples.
         """
 
-        return self.__triples_array[self.__valid_set_idx]
+        data = []
+        labels = []
+        for i in self.__valid_set_idx:
+            data.append(self.__triples_array[i])
+            data.extend(self.__corrupt_list[i][:corrupt_size])
+            labels.append(1)
+            labels.extend([0]*(len(data)-len(labels)))
+        return data, labels
 
     def get_all_triples(self):
         """
@@ -139,7 +170,25 @@ class KnowledgeGraph(object):
                                         entity_to_index[triple_lst[2]],
                                         relation_to_index[triple_lst[1]]))
 
-        self.__triples_array = np.array(list(self.__triples_set))
+        self.__triples_array = list(self.__triples_set)
+        
+    def make_corrupt(self, corrupt_size):
+        self.__corrupt_list = [ [] for _ in range(len(self.__triples_array))]
+        
+        for i in range(len(self.__triples_array)):
+            triple = self.__triples_array[i]
+
+            all_idx = np.random.permutation(self.number_of_entities())
+
+            idx = 0
+            for corrupt_i in range(corrupt_size):
+                while idx < len(all_idx) and self.check_triple((triple[0], all_idx[idx], triple[2])):
+                    idx = idx + 1
+                if idx == len(all_idx):
+                    break
+
+                self.__corrupt_list[i].append((triple[0], all_idx[idx], triple[2]))
+                idx = idx + 1
 
     def add_entities(self, entities_list):
         """

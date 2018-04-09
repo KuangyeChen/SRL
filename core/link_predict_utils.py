@@ -1,5 +1,6 @@
 import numpy as np
 import collections
+from datetime import datetime
 from sklearn.metrics import auc, precision_recall_curve, average_precision_score, precision_score
 from typing import Sequence, List, Tuple
 from core.knowledge_graph import *
@@ -66,10 +67,11 @@ def make_corrupt(one_batch, database, corrupt_size):
     for triple in one_batch:
         batch_data.append(triple)
         labels.append(1)
-
+        
         all_idx = np.random.permutation(num_entities)
 
         idx = 0
+        
         for corrupt_i in range(corrupt_size):
             while idx < len(all_idx) and database.check_triple((triple[0], all_idx[idx], triple[2])):
                 idx = idx + 1
@@ -79,7 +81,6 @@ def make_corrupt(one_batch, database, corrupt_size):
             batch_data.append((triple[0], all_idx[idx], triple[2]))
             labels.append(0)
             idx = idx + 1
-
     return batch_data, labels
 
 
